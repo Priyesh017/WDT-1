@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Modern DOM Calculator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+  </head>
+  <body
+    class="bg-neutral-100 flex flex-col justify-center items-center min-h-screen m-0 font-sans selection:bg-none"
+  >
+    <script>
+      // ==========================================
+      // REQUIREMENT: Use DOM to create HTML elements
+      // ==========================================
+
+      // 1. Creating the main responsive container
+      const container = document.createElement("div");
+      container.className =
+        "max-w-sm w-full py-6 bg-neutral-200 rounded-2xl shadow-xl border border-neutral-300";
+      document.body.appendChild(container);
+
+      // 2. Creating the display screen
+      const display = document.createElement("div");
+      display.id = "display";
+      display.className =
+        "text-right h-20 mx-6 mb-6 p-5 rounded-lg text-3xl bg-neutral-300 text-neutral-800 overflow-hidden flex items-baseline justify-end font-mono";
+      container.appendChild(display);
+
+      // 3. Creating the grid layout for the buttons
+      const grid = document.createElement("div");
+      grid.className = "grid grid-cols-4 gap-1 px-4 text-xl";
+      container.appendChild(grid);
+
+      // Array representing all calculator buttons including Modulus (%)
+      const buttons = [
+        "C",
+        "Del",
+        "%",
+        "/",
+        "7",
+        "8",
+        "9",
+        "X",
+        "4",
+        "5",
+        "6",
+        "-",
+        "1",
+        "2",
+        "3",
+        "+",
+        "0",
+        ".",
+        "=",
+      ];
+
+      // Loop through the array to dynamically create each button via DOM
+      buttons.forEach((text) => {
+        const btn = document.createElement("button");
+        btn.innerText = text;
+
+        let classes =
+          "flex justify-center items-center px-2 py-5 transition-all duration-200 hover:scale-110 cursor-pointer select-none rounded-lg font-bold";
+
+        // Apply specific Tailwind styles based on the button's function
+        if (["/", "X", "-", "+", "%"].includes(text)) {
+          classes += " text-blue-600 hover:text-blue-800";
+          if (text === "-" || text === "+") {
+            classes += " text-2xl";
+          }
+          if (text === "X") {
+            classes += " text-md";
+          }
+        } else if (text === "C") {
+          classes += " text-red-500 hover:text-red-600";
+        } else if (text === "=") {
+          classes = classes.replace(" hover:scale-110", "");
+          classes +=
+            " col-span-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 hover:scale-[1.02]";
+        } else {
+          classes += " text-neutral-600 hover:text-neutral-900";
+        }
+
+        btn.className = classes;
+        grid.appendChild(btn);
+      });
+
+      // ==========================================
+      // REQUIREMENT: Handle infix expressions & math operations
+      // OPTIONAL REQUIREMENT: Use localStorage for memory
+      // ==========================================
+
+      // Fetch existing data from local storage on page load
+      let currentInput = localStorage.getItem("modernCalcData") || "";
+
+      // Helper function to format the UI (makes operators smaller than numbers)
+      const renderDisplay = (text) => {
+        if (!text) {
+          display.innerHTML = "0";
+          return;
+        }
+        if (text === "Error") {
+          display.innerHTML = "Error";
+          return;
+        }
+
+        // Wraps operators in a span to style them differently from numbers
+        const formattedText = text.replace(
+          /([+\-X/%])/g,
+          '<span class="text-xl text-neutral-500 mx-1">$1</span>',
+        );
+        display.innerHTML = formattedText;
+      };
+
+      // Initialize the screen
+      renderDisplay(currentInput);
+
+      // Event delegation for mouse clicks
+      grid.addEventListener("click", (e) => {
+        if (e.target.tagName !== "BUTTON") return;
+        const val = e.target.innerText;
+
+        if (val === "C") {
+          currentInput = ""; // Clear
+        } else if (val === "Del") {
+          currentInput = currentInput.slice(0, -1); // Delete last char
+        } else if (val === "=") {
+          try {
+            if (currentInput) {
+              // Replace 'X' with '*' so JavaScript can evaluate it natively
+              let equationToSolve = currentInput.replace(/X/g, "*");
+              // eval() naturally processes infix expressions (e.g., 5 + 5 * 2)
+              currentInput = eval(equationToSolve).toString();
+            }
+          } catch (error) {
+            // Catch invalid infix expressions and display an error
+            currentInput = "Error";
+            setTimeout(() => {
+              currentInput = "";
+              renderDisplay(currentInput);
+            }, 1500);
+          }
+        } else {
+          // Logic to prevent stacking multiple operators (e.g., 5++3)
+          const operators = ["+", "-", "X", "/", "%"];
+
+          if (operators.includes(val)) {
+            // Prevent starting an equation with an operator (except minus)
+            if (currentInput === "" && val !== "-") {
+              return;
+            }
+
+            const lastChar = currentInput.slice(-1);
+
+            // If the user clicks two operators in a row, replace the first one with the second
+            if (operators.includes(lastChar)) {
+              currentInput = currentInput.slice(0, -1) + val;
+            } else {
+              currentInput += val;
+            }
+          } else {
+            // Logic to handle starting zeros (prevents "05", keeps "5")
+            if (val === ".") {
+              currentInput += val;
+            } else if (currentInput === "0") {
+              currentInput = val;
+            } else {
+              currentInput += val;
+            }
+          }
+        }
+
+        // Save the updated calculation to local storage
+        if (currentInput !== "Error") {
+          localStorage.setItem("modernCalcData", currentInput);
+        }
+
+        // Update the DOM display
+        renderDisplay(currentInput);
+      });
+
+      // ==========================================
+      // REQUIREMENT: Use keyboard events only for numbers.
+      // REQUIREMENT: Alert warning for non-number keys.
+      // ==========================================
+
+      document.addEventListener("keydown", (e) => {
+        // We only validate single character keys (ignores Shift, Enter, Backspace)
+        if (e.key.length === 1) {
+          // Regular expression to check if the typed key is a number from 0-9
+          if (!/[0-9]/.test(e.key)) {
+            // Alert exactly as requested in the problem statement
+            alert("Only numbers are allowed");
+            e.preventDefault();
+          } else {
+            // If it is a valid number, handle starting zeros and append it
+            if (currentInput === "0") {
+              currentInput = e.key;
+            } else {
+              currentInput += e.key;
+            }
+
+            // Save and render
+            localStorage.setItem("modernCalcData", currentInput);
+            renderDisplay(currentInput);
+          }
+        }
+      });
+    </script>
+
+    <script src="https://app.zenclass.in/sheets/v1/js/zen/suite/bundle.js"></script>
+  </body>
+</html>
